@@ -96,6 +96,49 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Review guidance is empty', result.stderr)
 
+    def test_adapter_detection_combines_pages_and_preserves_api_failures(self):
+        gh = self.root / 'gh'
+        gh.write_text(
+            f'#!{sys.executable}\n'
+            'import json, os, sys\n'
+            'if os.environ.get("GH_FAIL"): sys.exit(1)\n'
+            'pages = json.loads(os.environ["GH_PAGES"])\n'
+            'if "--slurp" in sys.argv: print(json.dumps(pages))\n'
+            'else:\n'
+            '    for page in pages: print(json.dumps(page))\n'
+        )
+        gh.chmod(0o755)
+        cases = [
+            ([[{'filename': 'src/one/a'}], [{'filename': 'src/one/b'},
+              {'filename': 'src/two/a'}]], 'one two', False),
+            ([[{'filename': 'src/one/a'}]], 'one', False),
+            ([[{'filename': 'docs/guide.md'}]], '', False),
+            ([], '', True),
+        ]
+        detection = step('structural-validation', 'Detect adapters')
+        script = detection['run'].replace('${{ github.repository }}', 'owner/repo')
+        script = script.replace('${{ steps.pr.outputs.number }}', '1')
+        command = ['bash', '-e']
+        if detection.get('shell') == 'bash':
+            command += ['-o', 'pipefail']
+        for pages, expected, fail in cases:
+            with self.subTest(pages=pages, api_failure=fail):
+                output = self.root / 'output'
+                output.unlink(missing_ok=True)
+                result = subprocess.run(
+                    [*command, '-c', script],
+                    cwd=self.root, capture_output=True, text=True,
+                    env={**os.environ, 'PATH': f"{self.root}{os.pathsep}{os.environ['PATH']}",
+                         'GH_PAGES': json.dumps(pages), 'GH_FAIL': '1' if fail else '',
+                         'GITHUB_OUTPUT': str(output)},
+                )
+                if fail:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(output.exists())
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(output.read_text(), f'adapters={expected}\n')
+
     def test_validation_executes_trusted_script_against_pr_files(self):
         trusted = self.root / 'trusted-adapters/scripts/validate_adapter.py'
         trusted.parent.mkdir(parents=True)
