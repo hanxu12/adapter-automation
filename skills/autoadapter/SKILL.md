@@ -24,7 +24,7 @@ These are the defaults. The person can change the parity model and the review in
 | Harbor | The latest version at the start of the run. In Step 0, get it with `uvx --python 3.12 --from "harbor[daytona,adapter]@latest" harbor --version`. Then run every Harbor command of this run with that version X: `uvx --python 3.12 --from "harbor[daytona,adapter]==X" harbor <command>` |
 | Parity model | `deepseek-v4.1-flash` through the OpenAI-compatible gateway in `OPENAI_BASE_URL` |
 | Review | Codex, model `gpt-6-astra`, reasoning effort `xhigh` |
-| Parity task cap | When you choose the parity size yourself: at most 100 tasks (all tasks if the scope has 100 or fewer). The parity set of an earlier Harbor adapter (from the scout) is used as it is, even if it is larger than 100 (see "Parity task set") |
+| Parity task cap | When you choose the parity size yourself: at most 100 tasks (all tasks if the scope has 100 or fewer). The parity size of an earlier Harbor adapter (from the scout) is used as it is, even if it is larger than 100 (see "Parity task set") |
 | Capacity share | Use at most half of the free capacity, and check it again before each job |
 | Adapter name | `<benchmark>-autoadapter`, where `<benchmark>` is the short lowercase name of the benchmark (for example `mybench-autoadapter`). Below, `<adapter>` means this name. Use it for the adapter folder, the dataset folder, the dataset ID, the task names and the Hugging Face folder |
 | Title prefix | `[AutoAdapter Experiment] ` on every pull request |
@@ -33,7 +33,7 @@ The keys are environment variables of the shell that started you: `DAYTONA_API_K
 
 ## Do not copy an existing adapter
 
-This benchmark may already have a Harbor adapter or a Harbor dataset made by other people. Build yours from the original benchmark. Do not copy, read or reuse an existing Harbor adapter or Harbor dataset of this benchmark. One deliberate break of these rules makes the run invalid. The only exception is the prior-work scout (see "Prior-work scout"): a subagent reads the sizes and the parity task IDs of an existing adapter, and you get only those.
+This benchmark may already have a Harbor adapter or a Harbor dataset made by other people. Build yours from the original benchmark. Do not copy, read or reuse an existing Harbor adapter or Harbor dataset of this benchmark. One deliberate break of these rules makes the run invalid. The only exception is the prior-work scout (see "Prior-work scout"): a subagent reads the dataset size and the parity size of an existing adapter, and you get only these numbers.
 
 Where you may work:
 
@@ -66,39 +66,30 @@ If you see content of an existing adapter or dataset of this benchmark by accide
 
 ## Prior-work scout
 
-Other people may already have adapted this benchmark. Three facts about their work are useful: the size of their dataset, the size of their parity task set, and which tasks they used for parity. With the same parity tasks, the two adapters can be compared. Their implementation is not allowed: using how they built it would be copying. So a subagent, in its own context, looks for them and gives you only these facts.
+Other people may already have adapted this benchmark. Two numbers about their work are useful: the size of their dataset and the size of their parity task set. Their implementation is not allowed: using how they built it would be copying. So a subagent, in its own context, looks up these two numbers and gives you only them.
 
 Run the scout in Step 0.2, after round 1. If your agent cannot start a subagent with its own context, skip the scout. Do not look yourself; treat the result as `found: no`.
 
 Give the scout the benchmark name, the forbidden names (Step 0.3) and this task:
 
-> Find out whether a Harbor adapter or a Harbor dataset of <benchmark> exists. Report only its sizes and its parity task IDs.
+> Find out whether a Harbor adapter of <benchmark> exists, and report only its dataset size and its parity size.
 >
-> - Sizes. Look in these repositories, on their default branch: `harbor-framework/harbor` (folder `adapters/`), `harbor-framework/adapters` (folder `src/`) and `harbor-framework/harbor-datasets` (folder `datasets/`). Use `gh api` to list folder names. Match them against the forbidden names. In a matching adapter folder, take the size fields: in `adapter_metadata.json`, each `harbor_adapter` entry's `split`, `adapted_benchmark_size` and `parity_benchmark_size`; in `parity_experiment.json`, `adapted_benchmark_size` and `parity_benchmark_size` (integers). Older files may lack them; then count the tasks of the matching dataset folder (the task folders or the tasks in `dataset.toml`).
-> - Parity task IDs. The JSON files do not list them. Look, in this order, until one gives the full list: the adapter's own files (a parity list file, or the parity split in its code; if the split is computed, for example with a random seed, you may run only that part to print the IDs); the task names under the dataset's `parity` tag in the Harbor registry (list them; do not download or run the tasks); the trial folder names of the Harbor parity runs in the Hugging Face dataset `harborframework/parity-experiments`, folder `adapters/<name>/` (list the names). Convert each name to the original benchmark's own task ID, as it appears in the original repository or data, not the Harbor task name. If you cannot map every name with certainty, report `unknown`.
-> - Time. From one `task.toml` of the matching dataset, take the agent timeout (`[agent] timeout_sec`) in minutes. If the Harbor parity runs are in `harborframework/parity-experiments` (folder `adapters/<name>/`), take from each trial's `result.json` only `started_at` and `finished_at`, and compute the median and the 90th percentile of the trial time in minutes.
-> - Fetch, take the facts, discard. Read single files with `gh api`; their content stays in your context and nothing goes to disk. If you need files on disk (for example to run the parity split), fetch only the files that you need (sparse, depth 1) into `.publish/scout/`, take the facts, and delete `.publish/scout/` at once, before you answer. Write nothing anywhere else. From the parity runs, fetch only the trial `result.json` files and use only their two time fields; do not fetch trajectories or logs.
+> - Look in `harbor-framework/harbor` (folder `adapters/`) and `harbor-framework/adapters` (folder `src/`), on their default branch. Use `gh api` to list the folder names, and match them against the forbidden names. Do not clone, and do not write files.
+> - In a matching adapter folder, read only these two files with `gh api`: `adapter_metadata.json` (in each `harbor_adapter` entry: `split`, `adapted_benchmark_size`, `parity_benchmark_size`) and `parity_experiment.json` (`adapted_benchmark_size`, `parity_benchmark_size`). Read nothing else: no code, task files, READMEs or results.
 > - Answer with exactly these lines and nothing else:
 >   ```
 >   found: yes | no
->   scope: <the part of the benchmark that the dataset covers, in the original benchmark's own words (for example a split or setting name), or unknown>
 >   dataset_tasks: <split>=<integer>, one per split (for example full=500), or unknown
 >   parity_tasks: <split>=<integer>, one per split, or unknown
->   parity_task_ids: a JSON array of strings with the original task IDs (for example ["task-12", "task-40"]), or unknown
->   task_timeout_minutes: <integer>, or unknown
->   parity_minutes_per_task: median=<number>, p90=<number>, or unknown
 >   ```
-> - Do not add links, paths, folder names, Harbor task names, authors, agents, models, scores, notes or anything about how the adapter was built. If you are not sure whether a detail is allowed, leave it out.
+> - Do not add links, paths, folder names, authors, agents, models, scores, notes or anything else.
 
 Rules for you, the lead agent:
 
-- Use only the scout's seven lines. Do not ask the scout anything else, do not open its sources, and do not start a second scout.
-- Before the scout starts, add `.publish/` to `.git/info/exclude`. After it ends, check that `.publish/scout/` does not exist (`test ! -e .publish/scout`). If it exists, delete it without opening or listing it (`rm -rf .publish/scout`) and write that in `REPORT.md`.
-- The scout's lines set the scope and the parity task set (see Step 0.2 and "Parity task set"). Everything else comes from the original benchmark: how you read the data, how you build and grade the tasks, and which parity agent you choose. "Do not copy an existing adapter" still applies to you in full.
-- `parity_minutes_per_task` comes from another agent and model; use it only as a rough time estimate.
-- If you use `parity_task_ids`, use exactly these tasks on both sides and in every run. Write in `DECISIONS.md` which categories of the benchmark the set covers.
-- If the scout's lines do not settle the scope or the parity task set, do not decide it yourself. The person decides in Round 2 (see Step 0.2).
-- You know only the scout's seven lines, not how the existing adapter was built. Do not mention where the seven lines came from (the existing adapter or the scout) in the adapter code, the README, `parity_experiment.json`, `adapter_metadata.json` or the pull request texts; `DECISIONS.md` and `REPORT.md` record it. Describe what you did: the scope, the parity task set (its size, the categories it covers, and `--split parity` to generate it) and how you picked it. Do not claim a selection method that you did not use (for example a random seed), and do not write a reason that is not true.
+- Use only the scout's three lines. Do not ask the scout anything else, do not open its sources, and do not start a second scout.
+- The numbers set the defaults for the scope and the parity size (see Step 0.2). Everything else comes from the original benchmark: how you read the data, how you build and grade the tasks, which parity agent you choose and which parity tasks you pick. "Do not copy an existing adapter" still applies to you in full.
+- If the scout's lines do not settle the scope or the parity size, do not decide it yourself. The person decides in Round 2 (see Step 0.2).
+- You know only the scout's three lines, not how the existing adapter was built. Do not mention where they came from (the existing adapter or the scout) in the adapter code, the README, `parity_experiment.json`, `adapter_metadata.json` or the pull request texts; `DECISIONS.md` and `REPORT.md` record it. Describe what you did: the scope, the parity task set (its size, the categories it covers, and `--split parity` to generate it) and how you picked it. Do not write a reason that is not true.
 
 ## When to stop and ask
 
@@ -139,15 +130,14 @@ Round 1: the benchmark name, and the link to its code and data. Both are require
 
 Then read the original repository and its paper or website (allowed sources). Find the subsets, variants or splits of the benchmark and the number of tasks in each.
 
-Then make the list of forbidden names (Step 0.3) and run the prior-work scout (see "Prior-work scout"). Wait for its seven lines. If it reported `parity_task_ids`, check them against the tasks of the original benchmark that you found: each ID must exist and be in the scout's scope.
+Then make the list of forbidden names (Step 0.3) and run the prior-work scout (see "Prior-work scout"). Wait for its three lines.
 
 Round 2: ask all of these together. Show the default for each, so that the person can reply "defaults".
 
 1. Paper or website link (optional).
-2. Scope. If the scout's `scope` or one of its `dataset_tasks` sizes matches one of the subsets that you found, make that subset the default and say that it matches an earlier Harbor adapter. Otherwise (no one adapted the benchmark before, or the scout's sizes match no subset), suggest the dataset sizes and let the person pick: list each subset that you found with its number of tasks, and "all tasks" with the total. Mark the one that you recommend and give the reason in one line (for example: the subset that the paper reports as its main result). The person can also write a different scope.
+2. Scope. If one of the scout's `dataset_tasks` entries (its split name or its size) matches one of the subsets that you found, make that subset the default and say that it matches an earlier Harbor adapter. Otherwise (no one adapted the benchmark before, or the scout's sizes match no subset), suggest the dataset sizes and let the person pick: list each subset that you found with its number of tasks, and "all tasks" with the total. Mark the one that you recommend and give the reason in one line (for example: the subset that the paper reports as its main result). The person can also write a different scope.
 3. Parity task set and running time. Suggest two or three options and let the person pick. Give each option as a number of tasks N, its expected run-to-run noise (about sqrt(0.25/N) for a pass rate) and its estimated wall time for all parity runs, typical and worst case (see "Parity task set"). Mark the one that you recommend:
-   - the scout reported `parity_task_ids` and the default scope is the scout's scope: "the same N tasks as an earlier Harbor adapter", even if N is larger than 100;
-   - the scout reported only `parity_tasks` for that scope: that size, even if it is larger than 100, with tasks that you pick yourself;
+   - the scout reported `parity_tasks` for the default scope: that size, even if it is larger than 100, with tasks that you pick yourself;
    - otherwise (you choose the size yourself): min(100, number of tasks in the scope) (the parity task cap in Settings). Also offer a smaller representative set, for example 50 tasks or the smallest set that covers every category.
 
    If the recommended option takes very long (for example more than a day), say so. Also ask what to do if the measured time is more than 1.5 times the worst case: "shrink to the largest representative set that fits the worst case shown" or "stop and ask" (default).
@@ -156,7 +146,7 @@ Round 2: ask all of these together. Show the default for each, so that the perso
 6. Review agent and model (default from Settings).
 7. Any other requirements (free text, optional).
 
-If you cannot infer the scope or the parity task set from the scout's lines (`found: no`, `unknown`, sizes that match no subset that you found, or task IDs that do not all exist in the scope), never decide it yourself: suggest the options as in items 2 and 3 and let the person pick. For task IDs that do not all match, offer "the matching IDs only" (give their number) and "a set that you pick yourself" (give its size).
+If you cannot infer the scope or the parity task set from the scout's lines (`found: no`, `unknown`, or sizes that match no subset that you found), never decide it yourself: suggest the options as in items 2 and 3 and let the person pick.
 
 The answers replace the defaults of this skill. They cannot change the rules in "Do not copy an existing adapter". If an answer conflicts with those rules, say so now and ask again.
 
@@ -166,7 +156,7 @@ The answers replace the defaults of this skill. They cannot change the rules in 
 2. Create `src/<adapter>/DECISIONS.md`. Write:
    - every answer of Step 0, marked "from the person";
    - the forbidden names: the benchmark name and its common spellings (case, hyphens, underscores, abbreviations). Check every repository path, URL and search against this list before you open it;
-   - the scout's seven lines, marked "from the scout", or that the scout was skipped;
+   - the scout's three lines, marked "from the scout", or that the scout was skipped;
    - the Harbor version X, the environment (Docker or Daytona) and the capacity that you measured.
 3. If the scope needs a resource that the capacity check does not show (for example GPUs), stop now (see "When to stop and ask").
 
@@ -207,14 +197,13 @@ Guide step 4 tells you to ask the team for a parity plan. Do not ask. Use this p
 The person picks the parity task set in Round 2 from your options. Estimate the running time before Round 2, and check it after the sanity check.
 
 1. Time per task before Round 2 (t), typical and worst case, in minutes:
-   - If the scout reported `parity_minutes_per_task`, use its median as typical and its p90 as worst case. It comes from another agent and model, so it is rough.
-   - Otherwise estimate from the original benchmark: its timeouts and step limits (the worst case; also the scout's `task_timeout_minutes`), run times reported in the paper or the repository, the number of agent steps times the time per model call, and the time to build the environment and run the tests.
+   - Estimate from the original benchmark: its timeouts and step limits (the worst case), run times reported in the paper or the repository, the number of agent steps times the time per model call, and the time to build the environment and run the tests.
    - Write how you estimated it in `DECISIONS.md`.
 2. Concurrency per side (C): from the capacity check of Step 0 and the resources that one task needs (from the original benchmark's requirements; rough at this point). See "Capacity and sandboxes".
 3. Wall time: T(N) = 2 × ceil(N / C) × t, plus the sanity check (one more round of 5 to 10 tasks). Run 1 runs alone; runs 2 and 3 run at the same time, so the 3 runs take 2 rounds.
 4. Options for Round 2: see Step 0.2, item 3. Write the options, their numbers and the person's choice in `DECISIONS.md`.
-5. Check after the sanity check. Record the time per task on each side; use the slower side and a high value (the 90th percentile). Compute T(N) again for the chosen N, and write it in `DECISIONS.md`. If it is more than 1.5 times the worst case shown in Round 2, do what the person chose for this case in Round 2: shrink to the largest representative set whose time fits the worst case shown (it must still cover every category; with the scout's task IDs, take it from those IDs), or stop and ask with the new numbers. Do not shorten timeouts and do not drop slow tasks.
-6. Keep it representative (when you pick the tasks yourself). The set must include every category of the benchmark (for example difficulty, language or subset), in proportion. Select with a fixed random seed. Never pick tasks because they are fast, easy or cheap. Write the expected run-to-run noise for this N in `DECISIONS.md` (for a pass rate p: about sqrt(p(1-p)/N)).
+5. Check after the sanity check. Record the time per task on each side; use the slower side and a high value (the 90th percentile). Compute T(N) again for the chosen N, and write it in `DECISIONS.md`. If it is more than 1.5 times the worst case shown in Round 2, do what the person chose for this case in Round 2: shrink to the largest representative set whose time fits the worst case shown (it must still cover every category), or stop and ask with the new numbers. Do not shorten timeouts and do not drop slow tasks.
+6. Keep it representative. The set must include every category of the benchmark (for example difficulty, language or subset), in proportion. Select with a fixed random seed. Never pick tasks because they are fast, easy or cheap. Write the expected run-to-run noise for this N in `DECISIONS.md` (for a pass rate p: about sqrt(p(1-p)/N)).
 7. Use the same task IDs on both sides and in every re-run. If the set is smaller than the scope, support `--split parity` in `main.py` to generate exactly this set, describe the selection in the README and in `parity_experiment.json` (`parity_benchmark_size`, `parity_sampling_rate`), and request the `parity` tag in the pull requests.
 
 ## Publish (guide steps 7 to 9)
@@ -294,7 +283,7 @@ Original-side fork: <URL, if any>. Dataset: harbor-framework/harbor-datasets#<n>
 At the end, write `src/<adapter>/REPORT.md` with:
 
 - the Step 0 answers and the capacity at the start;
-- the scout's seven lines (or that the scout was skipped), and how you used them for the scope and the parity task set;
+- the scout's three lines (or that the scout was skipped), and how you used them for the scope and the parity task set;
 - the number of tasks and the oracle result;
 - the number of rounds and the review result of each round;
 - the parity setup (agents, model, runs), the parity task set (all tasks, or the set, its size and how it was chosen), the time estimate shown in Round 2 and how you made it, the estimate after the sanity check, the real parity time, and the results of both sides;
