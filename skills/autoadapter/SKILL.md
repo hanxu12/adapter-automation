@@ -33,7 +33,7 @@ The keys are environment variables of the shell that started you: `DAYTONA_API_K
 
 ## Do not copy an existing adapter
 
-This benchmark may already have a Harbor adapter or a Harbor dataset made by other people. Build yours from the original benchmark. Do not copy, read or reuse an existing Harbor adapter or Harbor dataset of this benchmark. One deliberate break of these rules makes the run invalid.
+This benchmark may already have a Harbor adapter or a Harbor dataset made by other people. Build yours from the original benchmark. Do not copy, read or reuse an existing Harbor adapter or Harbor dataset of this benchmark. One deliberate break of these rules makes the run invalid. The only exception is the prior-work scout (see "Prior-work scout"): a subagent reads the sizes of an existing adapter, and you get only those numbers.
 
 Where you may work:
 
@@ -48,7 +48,7 @@ Other adapters:
 - Before you open one, check its name against the forbidden names (Step 0). Never open an adapter of this benchmark.
 - Do not search the code of these repositories, and do not read their history or pull request lists. The results can show this benchmark.
 
-For this benchmark, do not open:
+For this benchmark, do not open (only the scout may read the size fields named in "Prior-work scout"):
 
 - its folders and pull requests in `harbor-framework/adapters`, `harbor-index/adapters` and `harbor-framework/harbor`;
 - its dataset in `harbor-framework/harbor-datasets` (formerly `laude-institute/harbor-datasets`), in the Hugging Face datasets `harborframework/harbor-datasets` and `harborframework/parity-experiments`, and in the Harbor registry (do not download or run it, for example with `harbor run -d` or `harbor datasets`);
@@ -63,6 +63,33 @@ You may use: the benchmark links from Step 0, papers, the original evaluation co
 In Publish you push to some of the repositories above. Even then, do not open their files or pull requests for this benchmark. Clone `harbor-datasets` only as described in Publish (sparse, so that only `datasets/<adapter>` comes to the disk).
 
 If you see content of an existing adapter or dataset of this benchmark by accident (for example in a search snippet): stop reading it, do not use it, and write in `REPORT.md` what you saw, where and when. The person decides later whether the run is still valid.
+
+## Prior-work scout
+
+Other people may already have adapted this benchmark. The size of their dataset and of their parity task set are useful targets, but their implementation is not allowed: using how they built it would be copying. So a subagent, in its own context, looks for them and gives you only the sizes.
+
+Run the scout in Step 0.2, after round 1. If your agent cannot start a subagent with its own context, skip the scout. Do not look yourself; treat the result as `found: no`.
+
+Give the scout the benchmark name, the forbidden names (Step 0.3) and this task:
+
+> Find out whether a Harbor adapter or a Harbor dataset of <benchmark> exists, and report its sizes only.
+>
+> - Look only in these repositories, on their default branch: `harbor-framework/harbor` (folder `adapters/`), `harbor-framework/adapters` (folder `src/`) and `harbor-framework/harbor-datasets` (folder `datasets/`). Use `gh api` to list folder names and to read single files. Do not clone, and do not write files.
+> - Match the folder names against the forbidden names. In a matching adapter folder, read only the size fields of `parity_experiment.json` and `adapter_metadata.json` (`adapted_benchmark_size`, `parity_benchmark_size`, and the split names and sizes). In a matching dataset folder, count the tasks (the task folders or the tasks in `dataset.toml`). Do not read code, templates, task files or READMEs.
+> - Answer with exactly these lines and nothing else:
+>   ```
+>   found: yes | no
+>   dataset_tasks: <number, or unknown>
+>   scope: <the part of the benchmark that the dataset covers, in the original benchmark's own words (for example a split or setting name), or unknown>
+>   parity_tasks: <number, or unknown>
+>   ```
+> - Do not add links, paths, folder or task names, authors, agents, models, scores, notes or anything about how the adapter was built. If you are not sure whether a detail is allowed, leave it out.
+
+Rules for you, the lead agent:
+
+- Use only the scout's four lines. Do not ask the scout anything else, do not open its sources, and do not start a second scout.
+- The sizes are targets. Everything else comes from the original benchmark: how you read the data, build and grade the tasks, choose the parity agent and pick the parity tasks. "Do not copy an existing adapter" still applies to you in full.
+- Never refer to the existing adapter or to the scout in the adapter code, the README, `parity_experiment.json`, `adapter_metadata.json` or the pull request texts. Describe what you did (the scope, the parity size and how you picked the tasks), and do not write a reason that is not true.
 
 ## When to stop and ask
 
@@ -103,15 +130,18 @@ Round 1: the benchmark name, and the link to its code and data. Both are require
 
 Then read the original repository and its paper or website (allowed sources). Find the subsets, variants or splits of the benchmark and the number of tasks in each.
 
+Then make the list of forbidden names (Step 0.3) and run the prior-work scout (see "Prior-work scout"). Wait for its four lines.
+
 Round 2: ask all of these together. Show the default for each, so that the person can reply "defaults".
 
 1. Paper or website link (optional).
-2. Scope: offer the subsets that you found as options, and "all tasks". The person can also write a different scope.
-3. Docker (`-e docker`) or Daytona (`-e daytona`)? Ask only if `docker info` works; otherwise use Daytona.
-4. Parity model (default from Settings).
-5. Review agent and model (default from Settings).
-6. Parity time budget (default from Settings).
-7. Any other requirements (free text, optional).
+2. Scope. If the scout's `scope` or `dataset_tasks` matches one of the subsets that you found, make that subset the default and say that it matches an earlier Harbor adapter. Otherwise (no one adapted the benchmark before, or the scout's sizes match no subset), suggest the dataset sizes and let the person pick: list each subset that you found with its number of tasks, and "all tasks" with the total. Mark the one that you recommend and give the reason in one line (for example: the subset that the paper reports as its main result). The person can also write a different scope.
+3. Parity task set size. If the scout reported `parity_tasks` and the default scope is the scout's scope, make that number the default. Otherwise suggest two or three sizes and let the person pick: for example all tasks of the scope (if few), and one or two representative sets that cover every category. Give each size as a number of tasks with its expected run-to-run noise (about sqrt(0.25/N) for a pass rate). The default is "the largest representative set that fits the time budget" (see "Parity task set").
+4. Docker (`-e docker`) or Daytona (`-e daytona`)? Ask only if `docker info` works; otherwise use Daytona.
+5. Parity model (default from Settings).
+6. Review agent and model (default from Settings).
+7. Parity time budget (default from Settings).
+8. Any other requirements (free text, optional).
 
 The answers replace the defaults of this skill. They cannot change the rules in "Do not copy an existing adapter". If an answer conflicts with those rules, say so now and ask again.
 
@@ -121,6 +151,7 @@ The answers replace the defaults of this skill. They cannot change the rules in 
 2. Create `src/<adapter>/DECISIONS.md`. Write:
    - every answer of Step 0, marked "from the person";
    - the forbidden names: the benchmark name and its common spellings (case, hyphens, underscores, abbreviations). Check every repository path, URL and search against this list before you open it;
+   - the scout's four lines, marked "from the scout", or that the scout was skipped;
    - the Harbor version X, the environment (Docker or Daytona) and the capacity that you measured.
 3. If the scope needs a resource that the capacity check does not show (for example GPUs), stop now (see "When to stop and ask").
 
@@ -162,7 +193,7 @@ Decide the number of tasks and the tasks yourself:
 
 1. Measure. In the sanity check, record the time per task on each side. Use the slower side and a high value (for example the 90th percentile).
 2. Estimate. Use the concurrency per side from the capacity check. Wall time = rounds × ceil(N / concurrency) × time per task. Run 1 runs alone; runs 2 and 3 can run at the same time, so 3 runs take 2 rounds.
-3. Choose N. Take the largest N whose estimate fits the parity time budget. Use all tasks if they fit.
+3. Choose N. If Step 0 gave a parity task set size (from the scout or from the person), use it. If its estimate does not fit the parity time budget, stop and ask (see "When to stop and ask"). Without a size from Step 0, take the largest N whose estimate fits the parity time budget. Use all tasks if they fit.
 4. Keep it representative. The set must include every category of the benchmark (for example difficulty, language or subset), in proportion. Select with a fixed random seed. Never pick tasks because they are fast, easy or cheap. Write the expected run-to-run noise for this N in `DECISIONS.md` (for a pass rate p: about sqrt(p(1-p)/N)).
 5. Too slow. If even a set that covers every category does not fit the budget, stop and report the measured times and the estimate to the person. Do not shorten timeouts and do not drop slow tasks.
 6. Use the same task IDs on both sides and in every re-run. If the set is smaller than the scope, support `--split parity` in `main.py` to generate exactly this set, describe the selection in the README and in `parity_experiment.json` (`parity_benchmark_size`, `parity_sampling_rate`), and request the `parity` tag in the pull requests.
@@ -201,7 +232,7 @@ Rules for every title and body:
 
 - Write as the contributor, for the reviewer: short sentences, plain words, each fact once.
 - Only true numbers from the result files. Put details in the README and point to it (Notes & Caveats).
-- No implementation details (internal file formats, user accounts, markers). No internal process (review rounds, `DECISIONS.md`, `REPORT.md`). No experiment context: do not compare with another adapter, and do not write that an agent built it (the title prefix says that this is an experiment).
+- No implementation details (internal file formats, user accounts, markers). No internal process (review rounds, `DECISIONS.md`, `REPORT.md`). No experiment context: do not compare with or refer to another adapter (including the scout's sizes), and do not write that an agent built it (the title prefix says that this is an experiment).
 
 (a) Hugging Face `harborframework/parity-experiments`. Title: `[AutoAdapter Experiment] Add parity experiments for <adapter>`. Body:
 
@@ -244,6 +275,7 @@ Original-side fork: <URL, if any>. Dataset: harbor-framework/harbor-datasets#<n>
 At the end, write `src/<adapter>/REPORT.md` with:
 
 - the Step 0 answers and the capacity at the start;
+- the scout's four lines (or that the scout was skipped), and how you used them for the scope and the parity task set;
 - the number of tasks and the oracle result;
 - the number of rounds and the review result of each round;
 - the parity setup (agents, model, runs), the parity task set (all tasks, or the set, its size and how it was chosen), the estimated and the real parity time, and the results of both sides;
