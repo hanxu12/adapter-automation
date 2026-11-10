@@ -17,7 +17,7 @@ This skill works with any coding agent. If your agent cannot ask questions with 
 
 ## Settings
 
-These are the defaults. The person can change the parity model, the review and the parity time budget in Step 0.
+These are the defaults. The person can change the parity model, the review, the parity time budget and the parity task set in Step 0.
 
 | Setting | Value |
 |---|---|
@@ -25,6 +25,7 @@ These are the defaults. The person can change the parity model, the review and t
 | Parity model | `deepseek-v4.1-flash` through the OpenAI-compatible gateway in `OPENAI_BASE_URL` |
 | Review | Codex, model `gpt-6-astra`, reasoning effort `xhigh` |
 | Parity time budget | 4 hours of wall time for all parity runs together (see "Parity task set") |
+| Parity task cap | At most 100 tasks in the default parity task set; all tasks if the scope has 100 or fewer (see "Parity task set") |
 | Capacity share | Use at most half of the free capacity, and check it again before each job |
 | Adapter name | `<benchmark>-autoadapter`, where `<benchmark>` is the short lowercase name of the benchmark (for example `mybench-autoadapter`). Below, `<adapter>` means this name. Use it for the adapter folder, the dataset folder, the dataset ID, the task names and the Hugging Face folder |
 | Title prefix | `[AutoAdapter Experiment] ` on every pull request |
@@ -141,7 +142,7 @@ Round 2: ask all of these together. Show the default for each, so that the perso
 
 1. Paper or website link (optional).
 2. Scope. If the scout's `scope` or one of its `dataset_tasks` sizes matches one of the subsets that you found, make that subset the default and say that it matches an earlier Harbor adapter. Otherwise (no one adapted the benchmark before, or the scout's sizes match no subset), suggest the dataset sizes and let the person pick: list each subset that you found with its number of tasks, and "all tasks" with the total. Mark the one that you recommend and give the reason in one line (for example: the subset that the paper reports as its main result). The person can also write a different scope.
-3. Parity task set. If the default scope is the scout's scope and the scout reported `parity_task_ids`, the default is "the same N tasks as an earlier Harbor adapter" (give N). If it reported only `parity_tasks`, the default is that size, with tasks that you pick yourself. Otherwise suggest two or three sizes and let the person pick: for example all tasks of the scope (if few), and one or two representative sets that cover every category. Give each size as a number of tasks with its expected run-to-run noise (about sqrt(0.25/N) for a pass rate). The default is "the largest representative set that fits the time budget" (see "Parity task set").
+3. Parity task set. If the default scope is the scout's scope and the scout reported `parity_task_ids`, the default is "the same N tasks as an earlier Harbor adapter" (give N). If it reported only `parity_tasks`, the default is that size, with tasks that you pick yourself. Otherwise suggest two or three sizes and let the person pick: for example all tasks of the scope (if 100 or fewer), and one or two representative sets of at most 100 tasks that cover every category. Give each size as a number of tasks with its expected run-to-run noise (about sqrt(0.25/N) for a pass rate). The default is "the largest representative set of at most 100 tasks that fits the time budget" (see "Parity task set").
 4. Docker (`-e docker`) or Daytona (`-e daytona`)? Ask only if `docker info` works; otherwise use Daytona.
 5. Parity model (default from Settings).
 6. Review agent and model (default from Settings).
@@ -200,7 +201,7 @@ Decide the number of tasks and the tasks yourself:
 
 1. Measure. In the sanity check, record the time per task on each side. Use the slower side and a high value (for example the 90th percentile).
 2. Estimate. Use the concurrency per side from the capacity check. Wall time = rounds × ceil(N / concurrency) × time per task. Run 1 runs alone; runs 2 and 3 can run at the same time, so 3 runs take 2 rounds.
-3. Choose N. If Step 0 gave the parity task IDs (from the scout), use exactly those tasks and skip step 4. If Step 0 gave only a size (from the scout or from the person), use that N. In both cases, if the estimate does not fit the parity time budget, stop and ask (see "When to stop and ask"). Without either, take the largest N whose estimate fits the parity time budget. Use all tasks if they fit.
+3. Choose N. If Step 0 gave the parity task IDs (from the scout), use exactly those tasks and skip step 4. If Step 0 gave only a size (from the scout or from the person), use that N. In both cases, if the estimate does not fit the parity time budget, stop and ask (see "When to stop and ask"). Without either, take the largest N, at most 100 (the parity task cap in Settings), whose estimate fits the parity time budget. Use all tasks if the scope has 100 or fewer and they fit.
 4. Keep it representative (when you pick the tasks yourself). The set must include every category of the benchmark (for example difficulty, language or subset), in proportion. Select with a fixed random seed. Never pick tasks because they are fast, easy or cheap. Write the expected run-to-run noise for this N in `DECISIONS.md` (for a pass rate p: about sqrt(p(1-p)/N)).
 5. Too slow. If even a set that covers every category does not fit the budget, stop and report the measured times and the estimate to the person. Do not shorten timeouts and do not drop slow tasks.
 6. Use the same task IDs on both sides and in every re-run. If the set is smaller than the scope, support `--split parity` in `main.py` to generate exactly this set, describe the selection in the README and in `parity_experiment.json` (`parity_benchmark_size`, `parity_sampling_rate`), and request the `parity` tag in the pull requests.
