@@ -218,7 +218,7 @@ Per run (pass rate, %): original 66.67, 60.00, 40.00; Harbor 53.33, 46.67, 66.67
 
 Links: [original benchmark](https://github.com/cooperbench/CooperBench) ·
 [original-side fork](https://github.com/hanxu12/CooperBench/tree/harbor-parity) ·
-[adapter PR](ADAPTER_PR_URL) · [dataset PR](DATASET_PR_URL) · [parity results](PARITY_PR_URL)
+[adapter PR](https://github.com/harbor-index/adapter-automation/pull/12) · [dataset PR](https://github.com/harbor-framework/harbor-datasets/pull/279) · [parity results](https://huggingface.co/datasets/harborframework/parity-experiments/discussions/283)
 
 Reproduce the Harbor side (from the repository root):
 
