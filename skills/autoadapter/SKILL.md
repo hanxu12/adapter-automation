@@ -24,7 +24,7 @@ These are the defaults. The person can change the parity model and the review in
 | Harbor | The latest version at the start of the run. In Step 0, get it with `uvx --python 3.12 --from "harbor[daytona,adapter]@latest" harbor --version`. Then run every Harbor command of this run with that version X: `uvx --python 3.12 --from "harbor[daytona,adapter]==X" harbor <command>` |
 | Parity model | `deepseek-v4.1-flash` through the OpenAI-compatible gateway in `OPENAI_BASE_URL` |
 | Review | Codex, model `gpt-6-astra`, reasoning effort `xhigh` |
-| Parity task cap | At most 100 tasks in the parity task set that you recommend; all tasks if the scope has 100 or fewer (see "Parity task set") |
+| Parity task cap | When you choose the parity size yourself: at most 100 tasks (all tasks if the scope has 100 or fewer). The parity set of an earlier Harbor adapter (from the scout) is used as it is, even if it is larger than 100 (see "Parity task set") |
 | Capacity share | Use at most half of the free capacity, and check it again before each job |
 | Adapter name | `<benchmark>-autoadapter`, where `<benchmark>` is the short lowercase name of the benchmark (for example `mybench-autoadapter`). Below, `<adapter>` means this name. Use it for the adapter folder, the dataset folder, the dataset ID, the task names and the Hugging Face folder |
 | Title prefix | `[AutoAdapter Experiment] ` on every pull request |
@@ -146,9 +146,9 @@ Round 2: ask all of these together. Show the default for each, so that the perso
 1. Paper or website link (optional).
 2. Scope. If the scout's `scope` or one of its `dataset_tasks` sizes matches one of the subsets that you found, make that subset the default and say that it matches an earlier Harbor adapter. Otherwise (no one adapted the benchmark before, or the scout's sizes match no subset), suggest the dataset sizes and let the person pick: list each subset that you found with its number of tasks, and "all tasks" with the total. Mark the one that you recommend and give the reason in one line (for example: the subset that the paper reports as its main result). The person can also write a different scope.
 3. Parity task set and running time. Suggest two or three options and let the person pick. Give each option as a number of tasks N, its expected run-to-run noise (about sqrt(0.25/N) for a pass rate) and its estimated wall time for all parity runs, typical and worst case (see "Parity task set"). Mark the one that you recommend:
-   - the scout reported `parity_task_ids` and the default scope is the scout's scope: "the same N tasks as an earlier Harbor adapter";
-   - the scout reported only `parity_tasks` for that scope: that size, with tasks that you pick yourself;
-   - otherwise: min(100, number of tasks in the scope) (the parity task cap in Settings). Also offer a smaller representative set, for example 50 tasks or the smallest set that covers every category.
+   - the scout reported `parity_task_ids` and the default scope is the scout's scope: "the same N tasks as an earlier Harbor adapter", even if N is larger than 100;
+   - the scout reported only `parity_tasks` for that scope: that size, even if it is larger than 100, with tasks that you pick yourself;
+   - otherwise (you choose the size yourself): min(100, number of tasks in the scope) (the parity task cap in Settings). Also offer a smaller representative set, for example 50 tasks or the smallest set that covers every category.
 
    If the recommended option takes very long (for example more than a day), say so. Also ask what to do if the measured time is more than 1.5 times the worst case: "shrink to the largest representative set that fits the worst case shown" or "stop and ask" (default).
 4. Docker (`-e docker`) or Daytona (`-e daytona`)? Ask only if `docker info` works; otherwise use Daytona.
